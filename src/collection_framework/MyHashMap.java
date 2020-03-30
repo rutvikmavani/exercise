@@ -117,8 +117,7 @@ public class MyHashMap<K,V> implements Map {
     // helper method
     public Node<K,V> findNodeByKey(Object key) {
         if (key == null) return null;
-        int slot = key.hashCode()%capcity;
-
+        int slot = Math.abs(key.hashCode())%capcity;
         Node start = table.get(slot);
         while (start != null)
         {
@@ -156,7 +155,7 @@ public class MyHashMap<K,V> implements Map {
         Node<K,V> oldNode = findNodeByKey(key);
 
         if (oldNode == null) {
-            int slot = key.hashCode() % capcity;
+            int slot = Math.abs(key.hashCode()) % capcity;
             Node headNode = table.get(slot);
             Node newHeadNode = new Node(key, value, headNode);
             table.set(slot, newHeadNode);
@@ -210,7 +209,7 @@ public class MyHashMap<K,V> implements Map {
 
     @Override
     public Object remove(Object key) {
-        int slot = key.hashCode()%capcity;
+        int slot = Math.abs(key.hashCode())%capcity;
         Node<K,V> prev = table.get(slot);
         if (prev == null)
             return null;
