@@ -7,46 +7,48 @@ import java.util.List;
 public class Grep {
     public static void main(String args[]) throws IOException {
 
-        File file = new File(args[1]);
+        String pattern = args[0];
+        String filePath = args[1];
+
+        final int BUFFER_SIZE = 1024 * 8;
+        File file = new File(filePath);
         BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
 
-        String pattern = args[0];
-        int prefix[] = preProcess(pattern);
-        String str = null;
 
-        List<Integer> matchedLineNumbers = new ArrayList<>();
+        char[] buf = new char[BUFFER_SIZE];
+        int charactersRead = 0;
+
+        int[] LPS = preProcess(pattern);
+        int q = 0;
+        int patternLen = pattern.length();
         int lineNumber = 1;
-        while ((str = bufferedReader.readLine()) != null) {
-            boolean matchExist = patternMatching(str,pattern,prefix);
-            if (matchExist) {
-                matchedLineNumbers.add(lineNumber);
+        List<Integer> matchedLineNumbers = new ArrayList<>();
+        while((charactersRead = bufferedReader.read(buf,0,BUFFER_SIZE)) != -1) {
+
+            for(int i=0;i<charactersRead;i++) {
+                if (buf[i] == '\n')
+                    lineNumber++;
+
+                while (q > 0 && pattern.charAt(q) != buf[i])
+                    q = LPS[q-1];
+                if (pattern.charAt(q) == buf[i])
+                    q++;
+                if (q == patternLen) {
+                    /* match found */
+                    q = LPS[q-1];
+                    matchedLineNumbers.add(lineNumber);
+                }
             }
-            lineNumber++;
+
         }
 
         if (matchedLineNumbers.size() == 0)
             System.out.println("No match found");
         else {
-            for (Integer matchedLineNumber : matchedLineNumbers)
-                System.out.println("Match found at line number : " + matchedLineNumber);
+            for (Integer matchedLineNumber : matchedLineNumbers) {
+                System.out.println("Matching found at line number : " + matchedLineNumber);
+            }
         }
-    }
-    public static boolean patternMatching(String text,String pattern,int prefix[]) {
-
-        int textLen = text.length();
-        int patternLen = pattern.length();
-
-        int q = 0;
-        for(int i=0;i<textLen;i++) {
-            while (q > 0 && pattern.charAt(q) != text.charAt(i))
-                q = prefix[q-1];
-
-            if (pattern.charAt(q) == text.charAt(i))
-                q++;
-            if (q == patternLen)
-                return true;
-        }
-        return false;
     }
 
     public static int[] preProcess(String pattern) {
