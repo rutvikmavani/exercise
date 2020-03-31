@@ -1,6 +1,8 @@
 package Grep;
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Grep {
     public static void main(String args[]) throws IOException {
@@ -11,18 +13,23 @@ public class Grep {
         String pattern = args[0];
         int prefix[] = preProcess(pattern);
         String str = null;
-        boolean matchfound = false;
+
+        List<Integer> matchedLineNumbers = new ArrayList<>();
+        int lineNumber = 1;
         while ((str = bufferedReader.readLine()) != null) {
             boolean matchExist = patternMatching(str,pattern,prefix);
             if (matchExist) {
-                System.out.println("Match found");
-                matchfound = true;
-                break;
+                matchedLineNumbers.add(lineNumber);
             }
+            lineNumber++;
         }
 
-        if (!matchfound)
+        if (matchedLineNumbers.size() == 0)
             System.out.println("No match found");
+        else {
+            for (Integer matchedLineNumber : matchedLineNumbers)
+                System.out.println("Match found at line number : " + matchedLineNumber);
+        }
     }
     public static boolean patternMatching(String text,String pattern,int prefix[]) {
 
