@@ -256,7 +256,7 @@ public class MyHashMap<K,V> implements Map<K,V> {
     }
 
     @Override
-    public Set<Entry> entrySet() {
+    public Set<Entry<K,V>> entrySet() {
         return null;
     }
 
