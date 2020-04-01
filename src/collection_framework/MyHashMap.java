@@ -2,7 +2,7 @@ package collection_framework;
 
 import java.util.*;
 
-public class MyHashMap<K,V> implements Map {
+public class MyHashMap<K,V> implements Map<K,V> {
 
     static class Node<K,V> implements Map.Entry<K,V> {
         private final K key;
@@ -141,7 +141,7 @@ public class MyHashMap<K,V> implements Map {
     }
 
     @Override
-    public Object get(Object key) {
+    public V get(Object key) {
         Node<K,V> node = findNodeByKey(key);
         if (node != null) {
             return node.getValue();
@@ -150,7 +150,7 @@ public class MyHashMap<K,V> implements Map {
     }
 
     @Override
-    public Object put(Object key, Object value) {
+    public V put(Object key, Object value) {
 
         Node<K,V> oldNode = findNodeByKey(key);
 
@@ -208,7 +208,7 @@ public class MyHashMap<K,V> implements Map {
     }*/
 
     @Override
-    public Object remove(Object key) {
+    public V remove(Object key) {
         int slot = Math.abs(key.hashCode())%capcity;
         Node<K,V> prev = table.get(slot);
         if (prev == null)
@@ -218,16 +218,16 @@ public class MyHashMap<K,V> implements Map {
             numberOfNodes--;
             //if (2*numberOfNodes < (int)(loadFactor*capcity))
             //    rehashDecrese();
-            return prev;
+            return prev.getValue();
         }
-        Node curr = prev.next;
+        Node<K,V> curr = prev.next;
         while (curr != null) {
             if (curr.getKey().equals(key)) {
                 prev.next = curr.next;
                 numberOfNodes--;
                 //if (2*numberOfNodes < (int)(loadFactor*capcity))
                 //    rehashDecrese();
-                return  curr;
+                return  curr.getValue();
             }
             prev = prev.next;
             curr = curr.next;
