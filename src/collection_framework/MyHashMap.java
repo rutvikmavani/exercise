@@ -5,11 +5,12 @@ import java.util.*;
 public class MyHashMap<K,V> implements Map<K,V> {
 
     static class Node<K,V> implements Map.Entry<K,V> {
-        private final K key;
+        private K key;
         private V value;
         private Node<K,V> next;
 
-        public Node(K key,V value,Node<K,V> next)
+
+        Node(K key,V value,Node<K,V> next)
         {
             this.key = key;
             this.value = value;
@@ -27,81 +28,31 @@ public class MyHashMap<K,V> implements Map<K,V> {
         }
 
         @Override
-        public final V setValue(V newValue) {
+        public V setValue(V newValue) {
             V oldValue = value;
             value = newValue;
             return oldValue;
         }
 
-        @Override
-        public final int hashCode() {
-            return Objects.hashCode(key);
-        }
-
     }
 
-    /*-------------------------------------------------------------------------------------*/
+    static private final int DEFAULT_CAPACITY = 16;
+    static private final float DEFAULT_LOADFACTOR = 0.75f;
 
-    static final int DEFAULT_CAPACITY = 1<<4;
-    static final float DEFAULT_LOADFACTOR = 0.75f;
-
-    // tableSize
-    private int capcity;
+    private int capacity;        // table size
     private float loadFactor;
     private int numberOfNodes;
-    private ArrayList<Node<K,V> > table;
+    private Node<K,V> table[];
+
+    /* constructors */
+
     public MyHashMap() {
-        this.capcity = DEFAULT_CAPACITY;
+        this.capacity = DEFAULT_CAPACITY;
         this.loadFactor = DEFAULT_LOADFACTOR;
         this.numberOfNodes = 0;
-        table = new ArrayList<Node<K,V> >(capcity);
-        for (int i = 0;i < this.capcity;i++) {
-            table.add(null);
-        }
+        table = (Node<K,V>[]) new Node[capacity];
     }
 
-    public MyHashMap(int capcity) {
-        this.capcity = nearestTwoPower(capcity);
-        this.loadFactor = DEFAULT_LOADFACTOR;
-        this.numberOfNodes = 0;
-        table = new ArrayList<Node<K,V> >(capcity);
-        for (int i = 0;i < this.capcity;i++) {
-            table.add(null);
-        }
-    }
-
-    public MyHashMap(float loadFactor) {
-        this.capcity = DEFAULT_CAPACITY;
-        this.loadFactor = loadFactor;
-        this.numberOfNodes = 0;
-        table = new ArrayList<Node<K,V> >(capcity);
-        for (int i = 0;i < this.capcity;i++) {
-            table.add(null);
-        }
-    }
-
-    public MyHashMap(int capcity, float loadFactor) {
-        this.capcity = nearestTwoPower(capcity);
-        this.loadFactor = loadFactor;
-        this.numberOfNodes = 0;
-        table = new ArrayList<Node<K,V> >(capcity);
-        for (int i = 0;i < this.capcity;i++) {
-            table.add(null);
-        }
-    }
-
-    private int nearestTwoPower(int n)
-    {
-        n = n - 1;
-        n = n | (n >> 1);
-        n = n | (n >> 2);
-        n = n | (n >> 4);
-        n = n | (n >> 8);
-        n = n | (n >> 16);
-        return n + 1;
-    }
-
-    /*-------------------------------------------------------------------------------------*/
 
     @Override
     public int size() {
@@ -114,29 +65,22 @@ public class MyHashMap<K,V> implements Map<K,V> {
     }
 
 
-    // helper method
-    public Node<K,V> findNodeByKey(Object key) {
-        if (key == null) return null;
-        int slot = Math.abs(key.hashCode())%capcity;
-        Node start = table.get(slot);
-        while (start != null)
-        {
-            if (key.equals(start.getKey())) {
-                return start;
-            }
-            start = start.next;
-        }
-        return null;
-    }
-
     @Override
     public boolean containsKey(Object key) {
-        if (findNodeByKey(key) != null) return true;
-        return false;
+        if (findNodeByKey(key) == null) return false;
+        return true;
     }
 
     @Override
     public boolean containsValue(Object value) {
+
+        for (Node<K,V> start : table) {
+            while (start != null) {
+                if ((value == null && start.getValue() == null) || (value != null && value.equals(start.getValue())))
+                    return true;
+                start = start.next;
+            }
+        }
         return false;
     }
 
@@ -150,74 +94,38 @@ public class MyHashMap<K,V> implements Map<K,V> {
     }
 
     @Override
-    public V put(Object key, Object value) {
+    public V put(K key, V value) {
 
         Node<K,V> oldNode = findNodeByKey(key);
 
         if (oldNode == null) {
-            int slot = Math.abs(key.hashCode()) % capcity;
-            Node headNode = table.get(slot);
-            Node newHeadNode = new Node(key, value, headNode);
-            table.set(slot, newHeadNode);
+            int slot = 0;
+            if (key != null)
+                slot = Math.abs(key.hashCode()) % capacity;
+            Node<K,V> headNode = table[slot];
+            Node<K,V> newHeadNode = new Node<>(key, value, headNode);
+            table[slot] = newHeadNode;
             numberOfNodes++;
-            if (numberOfNodes > (int)(loadFactor * capcity))
+            if (numberOfNodes > (int)(loadFactor * capacity))
                 rehash();
             return null;
         }
 
-        V oldValue = oldNode.getValue();
-        oldNode.setValue((V) value);
+        return oldNode.setValue(value);
 
-        return oldValue;
     }
-
-    private void rehash() {
-        ArrayList<Node<K,V> > oldTable = table;
-        table = new ArrayList<Node<K,V> >(2*capcity );
-        for (int i = 0;i<2*capcity;i++)
-            table.add(null);
-
-        numberOfNodes = 0;
-        capcity = capcity*2;
-        for (Node<K,V> node: oldTable) {
-            Node<K,V> start = node;
-            while (start != null)
-            {
-                put(start.getKey(),start.getValue());
-                start = start.next;
-            }
-        }
-    }
-
-    /*private void rehashDecrese() {
-        ArrayList<Node<K,V> > oldTable = table;
-        table = new ArrayList<Node<K,V> >(capcity/2);
-        for (int i = 0;i<capcity/2;i++)
-            table.add(null);
-
-        numberOfNodes = 0;
-        capcity = capcity/2;
-        for (Node<K,V> node: oldTable) {
-            Node<K,V> start = node;
-            while (start != null)
-            {
-                put(start.getKey(),start.getValue());
-                start = start.next;
-            }
-        }
-    }*/
 
     @Override
     public V remove(Object key) {
-        int slot = Math.abs(key.hashCode())%capcity;
-        Node<K,V> prev = table.get(slot);
+        int slot = 0;
+        if (key != null)
+            slot = Math.abs(key.hashCode()) % capacity;
+        Node<K,V> prev = table[slot];
         if (prev == null)
             return null;
         if (prev.getKey().equals(key)) {
-            table.set(slot,prev.next);
+            table[slot] = prev.next;
             numberOfNodes--;
-            //if (2*numberOfNodes < (int)(loadFactor*capcity))
-            //    rehashDecrese();
             return prev.getValue();
         }
         Node<K,V> curr = prev.next;
@@ -225,8 +133,6 @@ public class MyHashMap<K,V> implements Map<K,V> {
             if (curr.getKey().equals(key)) {
                 prev.next = curr.next;
                 numberOfNodes--;
-                //if (2*numberOfNodes < (int)(loadFactor*capcity))
-                //    rehashDecrese();
                 return  curr.getValue();
             }
             prev = prev.next;
@@ -257,17 +163,56 @@ public class MyHashMap<K,V> implements Map<K,V> {
 
     @Override
     public Set<Entry<K,V>> entrySet() {
+        Set<Entry<K,V> > entries = new HashSet<>();
+        for(Node start : table) {
+            while (start != null) {
+                entries.add(start);
+                start = start.next;
+            }
+        }
+        return entries;
+    }
+
+    /* helper methods */
+    private Node<K,V> findNodeByKey(Object key) {
+        int slot = 0;
+        if (key != null)
+            slot = Math.abs(key.hashCode()) % capacity;
+        Node<K,V> start = table[slot];
+        while (start != null) {
+            if ((key == null && start.getKey() == null) || (key != null && key.equals(start.getKey()))) {
+                return start;
+            }
+            start = start.next;
+        }
         return null;
     }
 
+    private void rehash() {
+        Node<K, V>[] oldTable = table;
+        table = (Node<K, V>[]) new Node[2* capacity];
+
+        numberOfNodes = 0;
+        capacity = capacity *2;
+        for (Node<K,V> node: oldTable) {
+            Node<K,V> start = node;
+            while (start != null)
+            {
+                put(start.getKey(),start.getValue());
+                start = start.next;
+            }
+        }
+    }
+
+    /* content display method */
+
     public void display() {
-        System.out.println("Hash Table key-value:  | size : " + size() + " | capacity : " + capcity);
+        System.out.println("Hash Table key-value:  | size : " + size() + " | capacity : " + capacity);
         int count = 0;
         for (Node<K,V> node: table) {
             Node<K,V> start = node;
             System.out.print(count + " : ");
-            while (start != null)
-            {
+            while (start != null) {
                 System.out.print("(" + start.key + " " + start.value + ") ");
                 start = start.next;
             }
@@ -275,4 +220,5 @@ public class MyHashMap<K,V> implements Map<K,V> {
             System.out.println();
         }
     }
+
 }
