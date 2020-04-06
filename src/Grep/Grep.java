@@ -47,6 +47,8 @@ public class Grep {
 
     public static void main(String args[]) {
 
+        long programStartTime = System.currentTimeMillis();
+
         int argumentsLength = args.length;
         if (argumentsLength <= 1) {
             System.out.println("usage : java Grep [-flags] [keywordToSearch] [file/directory path ...]");
@@ -71,6 +73,12 @@ public class Grep {
                 System.out.println(e.toString());
             }
         }
+
+        long programEndTime = System.currentTimeMillis();
+
+        long ExecutionTimeInMilli = (programEndTime - programStartTime);
+        System.out.println("program execution time in milli seconds : " + ExecutionTimeInMilli);
+        System.out.println(programEndTime - programStartTime);
     }
 
     private static void matchFinder(MatchingCriteriaDetails matchingCriteriaDetails,String filePath) throws IOException {
