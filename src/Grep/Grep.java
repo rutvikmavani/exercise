@@ -41,6 +41,16 @@ public class Grep {
         public void setLPS(int[] LPS) {
             this.LPS = LPS;
         }
+
+        public boolean containsFlag(char f) {
+            if (flags == null)
+                return false;
+            for(int i=0;i<flags.length();i++) {
+                if (flags.charAt(i) == f)
+                    return true;
+            }
+            return false;
+        }
     }
 
     public static void main(String args[]) {
@@ -96,7 +106,8 @@ public class Grep {
     private static void matchingFromDirectory(MatchingCriteriaDetails matchingCriteriaDetails, File folder) throws IOException {
         for (File file : folder.listFiles()) {
             if (file.isDirectory()) {
-                matchingFromDirectory(matchingCriteriaDetails,file);
+                if (matchingCriteriaDetails.containsFlag('r'))
+                    matchingFromDirectory(matchingCriteriaDetails,file);
             } else {
                 matchingFromFile(matchingCriteriaDetails,file);
             }
