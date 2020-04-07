@@ -3,10 +3,8 @@ package Grep;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 public class Grep {
-
 
     private final static int BUFFER_SIZE = 1024 * 8;
     private static class MatchingCriteriaDetails {
@@ -68,7 +66,7 @@ public class Grep {
         while(argCount < argumentsLength) {
             String filePath = args[argCount++];
             try {
-                matchFinder(matchingCriteriaDetails, filePath);
+                matchingFromInitialFilePath(matchingCriteriaDetails, filePath);
             } catch (Exception e) {
                 System.out.println(e.toString());
             }
@@ -78,10 +76,9 @@ public class Grep {
 
         long ExecutionTimeInMilli = (programEndTime - programStartTime);
         System.out.println("program execution time in milli seconds : " + ExecutionTimeInMilli);
-        System.out.println(programEndTime - programStartTime);
     }
 
-    private static void matchFinder(MatchingCriteriaDetails matchingCriteriaDetails,String filePath) throws IOException {
+    private static void matchingFromInitialFilePath(MatchingCriteriaDetails matchingCriteriaDetails, String filePath) throws IOException {
 
         File file = new File(filePath);
         if (!file.exists()) {
@@ -90,55 +87,54 @@ public class Grep {
         }
 
         if (file.isDirectory()) {
-            directoryExplorer(matchingCriteriaDetails,file);
+            matchingFromDirectory(matchingCriteriaDetails,file);
         } else {
-            fileMatcher(matchingCriteriaDetails,file);
+            matchingFromFile(matchingCriteriaDetails,file);
         }
     }
 
-    private static void directoryExplorer(MatchingCriteriaDetails matchingCriteriaDetails, File folder) throws IOException {
+    private static void matchingFromDirectory(MatchingCriteriaDetails matchingCriteriaDetails, File folder) throws IOException {
         for (File file : folder.listFiles()) {
             if (file.isDirectory()) {
-                directoryExplorer(matchingCriteriaDetails,file);
+                matchingFromDirectory(matchingCriteriaDetails,file);
             } else {
-                fileMatcher(matchingCriteriaDetails,file);
+                matchingFromFile(matchingCriteriaDetails,file);
             }
         }
     }
 
-    private static void fileMatcher(MatchingCriteriaDetails matchingCriteriaDetails,File file) throws IOException {
+    private static void matchingFromFile(MatchingCriteriaDetails matchingCriteriaDetails, File file) throws IOException {
 
         BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
-
-        char[] buf = new char[BUFFER_SIZE];
 
         String keywordToSearch = matchingCriteriaDetails.getKeywordToSearch();
         int[] LPS = matchingCriteriaDetails.getLPS();
 
-        int q = 0;
         int keywordLen = keywordToSearch.length();
         int lineNumber = 1;
         List<Integer> matchedLineNumbers = new ArrayList<>();
 
-        int charactersRead = 0;
-        while((charactersRead = bufferedReader.read(buf,0,BUFFER_SIZE)) != -1) {
+        String str = null;
+        while ((str = bufferedReader.readLine()) != null) {
+            int q = 0;
+            for(int i=0;i<str.length();i++) {
 
-            for(int i=0;i<charactersRead;i++) {
-                if (buf[i] == '\n')
-                    lineNumber++;
-
-                while (q > 0 && keywordToSearch.charAt(q) != buf[i])
+                while (q > 0 && keywordToSearch.charAt(q) != str.charAt(i))
                     q = LPS[q-1];
-                if (keywordToSearch.charAt(q) == buf[i])
+
+                if (keywordToSearch.charAt(q) == str.charAt(i))
                     q++;
+
                 if (q == keywordLen) {
                     /* match found */
                     q = LPS[q-1];
                     matchedLineNumbers.add(lineNumber);
                 }
             }
-
+            lineNumber++;
         }
+
+        bufferedReader.close();
 
         if (matchedLineNumbers.size() == 0)
             System.out.println("No match found in file : " + file.getPath());
@@ -147,6 +143,7 @@ public class Grep {
                 System.out.println(file.getPath() + " : " + matchedLineNumber);
             }
         }
+
     }
 
     private static int[] preProcess(String pattern) {
