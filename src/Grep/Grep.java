@@ -3,19 +3,45 @@ package Grep;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class Grep {
+
+    private static class ThreadFunction implements Runnable {
+
+        MatchingCriteriaDetails matchingCriteriaDetails;
+        File file;
+
+        ThreadFunction(MatchingCriteriaDetails matchingCriteriaDetails,File file) {
+            this.matchingCriteriaDetails = matchingCriteriaDetails;
+            this.file = file;
+        }
+
+        @Override
+        public void run() {
+            try {
+                matchingFromFile(matchingCriteriaDetails,file);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
     private final static int BUFFER_SIZE = 1024 * 8;
     private static class MatchingCriteriaDetails {
         String keywordToSearch;
         String flags;               // to do
         int[] LPS;
+        ExecutorService executorService;
 
         MatchingCriteriaDetails(String keywordToSearch,String flags) {
             this.keywordToSearch = keywordToSearch;
             this.flags = flags;
             LPS = preProcess(keywordToSearch);
+            executorService = Executors.newFixedThreadPool(50);
         }
 
         public String getKeywordToSearch() {
@@ -53,7 +79,7 @@ public class Grep {
         }
     }
 
-    public static void main(String args[]) {
+    public static void main(String args[]) throws InterruptedException {
 
         long programStartTime = System.currentTimeMillis();
 
@@ -82,6 +108,10 @@ public class Grep {
             }
         }
 
+        matchingCriteriaDetails.executorService.awaitTermination(50, TimeUnit.SECONDS);
+        matchingCriteriaDetails.executorService.shutdown();
+
+
         long programEndTime = System.currentTimeMillis();
 
         long ExecutionTimeInMilli = (programEndTime - programStartTime);
@@ -109,7 +139,7 @@ public class Grep {
                 if (matchingCriteriaDetails.containsFlag('r'))
                     matchingFromDirectory(matchingCriteriaDetails,file);
             } else {
-                matchingFromFile(matchingCriteriaDetails,file);
+                matchingCriteriaDetails.executorService.execute(new ThreadFunction(matchingCriteriaDetails,file));
             }
         }
     }
