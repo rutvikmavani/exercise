@@ -6,7 +6,6 @@ import java.util.List;
 
 public class Grep {
 
-    private final static int BUFFER_SIZE = 1024 * 8;
     private static class MatchingCriteriaDetails {
         String keywordToSearch;
         String flags;               // to do
