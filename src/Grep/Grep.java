@@ -2,19 +2,29 @@ package Grep;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class Grep {
 
     private static class MatchingCriteriaDetails {
         String keywordToSearch;
-        String flags;               // to do
+        Set<Character> flags;
         int[] LPS;
+        public long ioTime;
+        public long fileMatchingTime;
 
-        MatchingCriteriaDetails(String keywordToSearch,String flags) {
+        MatchingCriteriaDetails(String keywordToSearch,String flagStr) {
             this.keywordToSearch = keywordToSearch;
-            this.flags = flags;
+
+            flags = new HashSet<>();
+            fillflags(flagStr);
+
             LPS = preProcess(keywordToSearch);
+
+            ioTime = 0;
+            fileMatchingTime = 0;
         }
 
         public String getKeywordToSearch() {
@@ -25,14 +35,6 @@ public class Grep {
             this.keywordToSearch = keywordToSearch;
         }
 
-        public String getFlags() {
-            return flags;
-        }
-
-        public void setFlags(String flags) {
-            this.flags = flags;
-        }
-
         public int[] getLPS() {
             return LPS;
         }
@@ -41,14 +43,17 @@ public class Grep {
             this.LPS = LPS;
         }
 
-        public boolean containsFlag(char f) {
-            if (flags == null)
-                return false;
-            for(int i=0;i<flags.length();i++) {
-                if (flags.charAt(i) == f)
-                    return true;
+        private void fillflags(String flagStr) {
+            if (flagStr == null)
+                return;
+
+            for (int i = 1; i < flagStr.length(); i++) {
+                flags.add(flagStr.charAt(i));
             }
-            return false;
+        }
+
+        public boolean containsFlag(char f) {
+            return flags.contains(f);
         }
     }
 
@@ -62,6 +67,7 @@ public class Grep {
             return;
         }
 
+
         int argCount = 0;
         String flags = null;
         if (args[0].charAt(0) == '-') {
@@ -70,14 +76,13 @@ public class Grep {
         }
         String keywordToSearch = args[argCount++];
 
-
         MatchingCriteriaDetails matchingCriteriaDetails = new MatchingCriteriaDetails(keywordToSearch,flags);
         while(argCount < argumentsLength) {
             String filePath = args[argCount++];
             try {
                 matchingFromInitialFilePath(matchingCriteriaDetails, filePath);
             } catch (Exception e) {
-                System.out.println(e.toString());
+                e.printStackTrace();
             }
         }
 
@@ -85,6 +90,14 @@ public class Grep {
 
         long ExecutionTimeInMilli = (programEndTime - programStartTime);
         System.out.println("program execution time in milli seconds : " + ExecutionTimeInMilli);
+        System.out.println("program IO time in milli seconds : " + matchingCriteriaDetails.ioTime);
+        System.out.println("program file processing time in milli seconds : " + matchingCriteriaDetails.fileMatchingTime);
+
+//        program arguments : -r apple /Users/rutvikmavani/directory2/wikiText/text
+//        program execution time in milli seconds : 78015
+//        program IO time in milli seconds : 46138
+//        program file process time in milli seconds : 31300
+
     }
 
     private static void matchingFromInitialFilePath(MatchingCriteriaDetails matchingCriteriaDetails, String filePath) throws IOException {
@@ -108,7 +121,10 @@ public class Grep {
                 if (matchingCriteriaDetails.containsFlag('r'))
                     matchingFromDirectory(matchingCriteriaDetails,file);
             } else {
+                long fileMatchStartTime = System.currentTimeMillis();
                 matchingFromFile(matchingCriteriaDetails,file);
+                long fileMatchEndTime = System.currentTimeMillis();
+                matchingCriteriaDetails.fileMatchingTime += (fileMatchEndTime - fileMatchStartTime);
             }
         }
     }
@@ -125,7 +141,17 @@ public class Grep {
         List<Integer> matchedLineNumbers = new ArrayList<>();
 
         String str = null;
-        while ((str = bufferedReader.readLine()) != null) {
+        long lineReadingTime = 0;
+        while (true) {
+
+            long lineReadingStartTime = System.currentTimeMillis();
+            str = bufferedReader.readLine();
+            long lineReadingEndTime = System.currentTimeMillis();
+            if (str == null)
+                break;
+
+            matchingCriteriaDetails.ioTime += lineReadingEndTime - lineReadingStartTime;
+
             int q = 0;
             for(int i=0;i<str.length();i++) {
 
@@ -146,13 +172,16 @@ public class Grep {
 
         bufferedReader.close();
 
-        if (matchedLineNumbers.size() == 0)
-            System.out.println("No match found in file : " + file.getPath());
-        else {
-            for (Integer matchedLineNumber : matchedLineNumbers) {
-                System.out.println(file.getPath() + " : " + matchedLineNumber);
-            }
-        }
+
+
+//        if (matchedLineNumbers.size() == 0)
+//            System.out.println("No match found in file : " + file.getPath());
+//        else {
+//            for (Integer matchedLineNumber : matchedLineNumbers) {
+//                System.out.println(file.getPath() + " : " + matchedLineNumber);
+//            }
+//        }
+        System.out.println(file.getPath() + " : " + matchedLineNumbers.size());
 
     }
 
