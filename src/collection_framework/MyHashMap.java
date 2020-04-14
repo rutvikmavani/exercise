@@ -41,83 +41,53 @@ public class MyHashMap<K,V> implements Map<K,V> {
 
             private int slotIndex;
             private Node<K,V> slotNode;
-            private Node<K,V> slotPrevNode;
-            private MyHashMap<K,V> myHashMap;
-            boolean canDelete;
+            private Node<K,V> slotNextNode;
+
             EntrySetIterator() {
-                this.slotIndex = 0;
-                this.slotNode = null;
-                this.slotPrevNode = null;
-                this.myHashMap = EntrySet.this.myHashMap;
-                this.canDelete = false;
+                slotIndex = 0;
+                slotNode = null;
+                slotNextNode = null;
+                while(slotIndex < MyHashMap.this.table.length && MyHashMap.this.table[slotIndex] == null)
+                    slotIndex++;
+                if (slotIndex == MyHashMap.this.table.length)
+                    slotNextNode = null;
+                else
+                    slotNextNode = MyHashMap.this.table[slotIndex];
             }
 
             @Override
             public boolean hasNext() {
-                int slotIndexCopy = this.slotIndex;
-                Node<K,V> slotNodeCopy = this.slotNode;
-
-                if (slotNodeCopy == null || slotNodeCopy.next == null) {
-
-                    if (slotNodeCopy != null)
-                        slotIndexCopy++;
-
-                    while (slotIndexCopy < myHashMap.table.length && myHashMap.table[slotIndexCopy] == null)
-                        slotIndexCopy++;
-
-                    if (slotIndexCopy == myHashMap.table.length)
-                        return false;
-
-                    /* --------------- otherwise slot will have non null node --------------- */
-                    return true;
-                }
-
-                /* slotNodeCopy.next is not null */
-                return true;
+                return (slotNextNode != null);
             }
 
             @Override
             public Entry<K, V> next() {
+                if (slotNextNode == null)
+                    throw new NoSuchElementException();
 
-                if (slotNode == null || slotNode.next == null) {
-
-                    if (slotNode != null)
+                slotNode = slotNextNode;
+                if (slotNextNode.next == null) {
+                    slotIndex++;
+                    while(slotIndex < MyHashMap.this.table.length && MyHashMap.this.table[slotIndex] == null)
                         slotIndex++;
-
-                    while (slotIndex < myHashMap.table.length && myHashMap.table[slotIndex] == null)
-                        slotIndex++;
-
-                    if (slotIndex == myHashMap.table.length)
-                        throw new NoSuchElementException();
-
-                    /* --------------- otherwise slot will have non null node --------------- */
-                    slotNode = myHashMap.table[slotIndex];
-                    slotPrevNode = null;
-                    canDelete = true;
-                    return slotNode;
+                    if (slotIndex == MyHashMap.this.table.length)
+                        slotNextNode = null;
+                    else
+                        slotNextNode = MyHashMap.this.table[slotIndex];
                 }
-                slotPrevNode = slotNode;
-                slotNode = slotNode.next;
-                canDelete = true;
+                else
+                    slotNextNode = slotNextNode.next;
                 return slotNode;
             }
 
             @Override
             public void remove() {
-                if (!canDelete)
+                if (slotNode == null) {
                     throw new IllegalStateException();
-
-                if (slotPrevNode == null) {
-                    /* ---------- remove head ----------- */
-                    myHashMap.table[slotIndex] = slotNode.next;
-                    slotNode = null;
-                } else {
-                    slotPrevNode.next = slotNode.next;
-                    slotNode = slotPrevNode;
-                    slotPrevNode = null;
                 }
-                canDelete = false;
-                myHashMap.numberOfNodes--;
+                K keyRef = slotNode.getKey();
+                MyHashMap.this.remove(keyRef);
+                slotNode = null;
             }
         }
 
@@ -199,83 +169,52 @@ public class MyHashMap<K,V> implements Map<K,V> {
 
             private int slotIndex;
             private Node<K,V> slotNode;
-            private Node<K,V> slotPrevNode;
-            private MyHashMap<K,V> myHashMap;
-            boolean canDelete;
+            private Node<K,V> slotNextNode;
             KeySetIterator() {
-                this.slotIndex = 0;
-                this.slotNode = null;
-                this.slotPrevNode = null;
-                this.myHashMap = KeySet.this.myHashMap;
-                this.canDelete = false;
+                slotIndex = 0;
+                slotNode = null;
+                slotNextNode = null;
+                while(slotIndex < MyHashMap.this.table.length && MyHashMap.this.table[slotIndex] == null)
+                    slotIndex++;
+                if (slotIndex == MyHashMap.this.table.length)
+                    slotNextNode = null;
+                else
+                    slotNextNode = MyHashMap.this.table[slotIndex];
             }
 
             @Override
             public boolean hasNext() {
-                int slotIndexCopy = this.slotIndex;
-                Node<K,V> slotNodeCopy = this.slotNode;
-
-                if (slotNodeCopy == null || slotNodeCopy.next == null) {
-
-                    if (slotNodeCopy != null)
-                        slotIndexCopy++;
-
-                    while (slotIndexCopy < myHashMap.table.length && myHashMap.table[slotIndexCopy] == null)
-                        slotIndexCopy++;
-
-                    if (slotIndexCopy == myHashMap.table.length)
-                        return false;
-
-                    /* --------------- otherwise slot will have non null node --------------- */
-                    return true;
-                }
-
-                /* slotNodeCopy.next is not null */
-                return true;
+                return (slotNextNode != null);
             }
 
             @Override
             public K next() {
+                if (slotNextNode == null)
+                    throw new NoSuchElementException();
 
-                if (slotNode == null || slotNode.next == null) {
-
-                    if (slotNode != null)
+                slotNode = slotNextNode;
+                if (slotNextNode.next == null) {
+                    slotIndex++;
+                    while(slotIndex < MyHashMap.this.table.length && MyHashMap.this.table[slotIndex] == null)
                         slotIndex++;
-
-                    while (slotIndex < myHashMap.table.length && myHashMap.table[slotIndex] == null)
-                        slotIndex++;
-
-                    if (slotIndex == myHashMap.table.length)
-                        throw new NoSuchElementException();
-
-                    /* --------------- otherwise slot will have non null node --------------- */
-                    slotNode = myHashMap.table[slotIndex];
-                    slotPrevNode = null;
-                    canDelete = true;
-                    return slotNode.getKey();
+                    if (slotIndex == MyHashMap.this.table.length)
+                        slotNextNode = null;
+                    else
+                        slotNextNode = MyHashMap.this.table[slotIndex];
                 }
-                slotPrevNode = slotNode;
-                slotNode = slotNode.next;
-                canDelete = true;
+                else
+                    slotNextNode = slotNextNode.next;
                 return slotNode.getKey();
             }
 
             @Override
             public void remove() {
-                if (!canDelete)
+                if (slotNode == null) {
                     throw new IllegalStateException();
-
-                if (slotPrevNode == null) {
-                    /* ---------- remove head ----------- */
-                    myHashMap.table[slotIndex] = slotNode.next;
-                    slotNode = null;
-                } else {
-                    slotPrevNode.next = slotNode.next;
-                    slotNode = slotPrevNode;
-                    slotPrevNode = null;
                 }
-                canDelete = false;
-                myHashMap.numberOfNodes--;
+                K keyRef = slotNode.getKey();
+                MyHashMap.this.remove(keyRef);
+                slotNode = null;
             }
         }
 
@@ -355,83 +294,53 @@ public class MyHashMap<K,V> implements Map<K,V> {
 
             private int slotIndex;
             private Node<K,V> slotNode;
-            private Node<K,V> slotPrevNode;
-            private MyHashMap<K,V> myHashMap;
-            boolean canDelete;
+            private Node<K,V> slotNextNode;
             ValueCollectionIterator() {
-                this.slotIndex = 0;
-                this.slotNode = null;
-                this.slotPrevNode = null;
-                this.myHashMap = ValueCollection.this.myHashMap;
-                this.canDelete = false;
+                slotIndex = 0;
+                slotNode = null;
+                slotNextNode = null;
+                while(slotIndex < MyHashMap.this.table.length && MyHashMap.this.table[slotIndex] == null)
+                    slotIndex++;
+                if (slotIndex == MyHashMap.this.table.length)
+                    slotNextNode = null;
+                else
+                    slotNextNode = MyHashMap.this.table[slotIndex];
             }
 
             @Override
             public boolean hasNext() {
-                int slotIndexCopy = this.slotIndex;
-                Node<K,V> slotNodeCopy = this.slotNode;
-
-                if (slotNodeCopy == null || slotNodeCopy.next == null) {
-
-                    if (slotNodeCopy != null)
-                        slotIndexCopy++;
-
-                    while (slotIndexCopy < myHashMap.table.length && myHashMap.table[slotIndexCopy] == null)
-                        slotIndexCopy++;
-
-                    if (slotIndexCopy == myHashMap.table.length)
-                        return false;
-
-                    /* --------------- otherwise slot will have non null node --------------- */
-                    return true;
-                }
-
-                /* slotNodeCopy.next is not null */
-                return true;
+                return (slotNextNode != null);
             }
 
             @Override
             public V next() {
 
-                if (slotNode == null || slotNode.next == null) {
+                if (slotNextNode == null)
+                    throw new NoSuchElementException();
 
-                    if (slotNode != null)
+                slotNode = slotNextNode;
+                if (slotNextNode.next == null) {
+                    slotIndex++;
+                    while(slotIndex < MyHashMap.this.table.length && MyHashMap.this.table[slotIndex] == null)
                         slotIndex++;
-
-                    while (slotIndex < myHashMap.table.length && myHashMap.table[slotIndex] == null)
-                        slotIndex++;
-
-                    if (slotIndex == myHashMap.table.length)
-                        throw new NoSuchElementException();
-
-                    /* --------------- otherwise slot will have non null node --------------- */
-                    slotNode = myHashMap.table[slotIndex];
-                    slotPrevNode = null;
-                    canDelete = true;
-                    return slotNode.getValue();
+                    if (slotIndex == MyHashMap.this.table.length)
+                        slotNextNode = null;
+                    else
+                        slotNextNode = MyHashMap.this.table[slotIndex];
                 }
-                slotPrevNode = slotNode;
-                slotNode = slotNode.next;
-                canDelete = true;
+                else
+                    slotNextNode = slotNextNode.next;
                 return slotNode.getValue();
             }
 
             @Override
             public void remove() {
-                if (!canDelete)
+                if (slotNode == null) {
                     throw new IllegalStateException();
-
-                if (slotPrevNode == null) {
-                    /* ---------- remove head ----------- */
-                    myHashMap.table[slotIndex] = slotNode.next;
-                    slotNode = null;
-                } else {
-                    slotPrevNode.next = slotNode.next;
-                    slotNode = slotPrevNode;
-                    slotPrevNode = null;
                 }
-                canDelete = false;
-                myHashMap.numberOfNodes--;
+                K keyRef = slotNode.getKey();
+                MyHashMap.this.remove(keyRef);
+                slotNode = null;
             }
         }
 
@@ -576,11 +485,11 @@ public class MyHashMap<K,V> implements Map<K,V> {
             int slot = 0;
             if (key != null)
                 slot = Math.abs(key.hashCode()) % capacity;
-            Node<K,V> headNode = table[slot];
-            Node<K,V> newHeadNode = new Node<>(key, value, headNode);
+            Node<K, V> headNode = table[slot];
+            Node<K, V> newHeadNode = new Node<>(key, value, headNode);
             table[slot] = newHeadNode;
             numberOfNodes++;
-            if (numberOfNodes > (int)(loadFactor * capacity))
+            if (numberOfNodes > (int) (loadFactor * capacity))
                 rehash();
             return null;
         }
@@ -595,19 +504,21 @@ public class MyHashMap<K,V> implements Map<K,V> {
         if (key != null)
             slot = Math.abs(key.hashCode()) % capacity;
         Node<K,V> prev = table[slot];
-        if (prev == null)
+        if (prev == null) {
             return null;
-        if (prev.getKey().equals(key)) {
+        }
+
+        if ((prev.getKey() == null && key == null) || (prev.getKey() != null && prev.getKey().equals(key))) {
             table[slot] = prev.next;
             numberOfNodes--;
             return prev.getValue();
         }
         Node<K,V> curr = prev.next;
         while (curr != null) {
-            if (curr.getKey().equals(key)) {
+            if ((curr.getKey() == null && key == null) || (curr.getKey() != null && curr.getKey().equals(key))) {
                 prev.next = curr.next;
                 numberOfNodes--;
-                return  curr.getValue();
+                return curr.getValue();
             }
             prev = prev.next;
             curr = curr.next;
@@ -677,10 +588,10 @@ public class MyHashMap<K,V> implements Map<K,V> {
 
     private void rehash() {
         Node<K, V>[] oldTable = table;
-        table = (Node<K, V>[]) new Node[2* capacity];
+        table = (Node<K, V>[]) new Node[2 * capacity];
 
         numberOfNodes = 0;
-        capacity = capacity *2;
+        capacity = capacity * 2;
         for (Node<K,V> start: oldTable) {
             while (start != null)
             {
