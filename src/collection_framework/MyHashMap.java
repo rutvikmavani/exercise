@@ -418,7 +418,7 @@ public class MyHashMap<K,V> implements Map<K,V> {
     static private final int DEFAULT_CAPACITY = 16;
     static private final float DEFAULT_LOADFACTOR = 0.75f;
 
-    private int capacity;        // table size
+    private int numberOfSlots;        // table size
     private float loadFactor;
     private int numberOfNodes;
     private Node<K,V> table[];
@@ -430,10 +430,10 @@ public class MyHashMap<K,V> implements Map<K,V> {
     /* constructors */
 
     public MyHashMap() {
-        this.capacity = DEFAULT_CAPACITY;
+        this.numberOfSlots = DEFAULT_CAPACITY;
         this.loadFactor = DEFAULT_LOADFACTOR;
         this.numberOfNodes = 0;
-        table = (Node<K,V>[]) new Node[capacity];
+        table = (Node<K,V>[]) new Node[numberOfSlots];
     }
 
 
@@ -484,12 +484,12 @@ public class MyHashMap<K,V> implements Map<K,V> {
         if (oldNode == null) {
             int slot = 0;
             if (key != null)
-                slot = Math.abs(key.hashCode()) % capacity;
+                slot = Math.abs(key.hashCode()) % numberOfSlots;
             Node<K, V> headNode = table[slot];
             Node<K, V> newHeadNode = new Node<>(key, value, headNode);
             table[slot] = newHeadNode;
             numberOfNodes++;
-            if (numberOfNodes > (int) (loadFactor * capacity))
+            if (numberOfNodes > (int) (loadFactor * numberOfSlots))
                 rehash();
             return null;
         }
@@ -502,7 +502,7 @@ public class MyHashMap<K,V> implements Map<K,V> {
     public V remove(Object key) {
         int slot = 0;
         if (key != null)
-            slot = Math.abs(key.hashCode()) % capacity;
+            slot = Math.abs(key.hashCode()) % numberOfSlots;
         Node<K,V> prev = table[slot];
         if (prev == null) {
             return null;
@@ -555,7 +555,7 @@ public class MyHashMap<K,V> implements Map<K,V> {
     private Node<K,V> findNodeByKey(Object key) {
         int slot = 0;
         if (key != null)
-            slot = Math.abs(key.hashCode()) % capacity;
+            slot = Math.abs(key.hashCode()) % numberOfSlots;
         Node<K,V> start = table[slot];
         while (start != null) {
             if ((key == null && start.getKey() == null) || (key != null && key.equals(start.getKey()))) {
@@ -588,10 +588,10 @@ public class MyHashMap<K,V> implements Map<K,V> {
 
     private void rehash() {
         Node<K, V>[] oldTable = table;
-        table = (Node<K, V>[]) new Node[2 * capacity];
+        table = (Node<K, V>[]) new Node[2 * numberOfSlots];
 
         numberOfNodes = 0;
-        capacity = capacity * 2;
+        numberOfSlots = numberOfSlots * 2;
         for (Node<K,V> start: oldTable) {
             while (start != null)
             {
@@ -604,7 +604,7 @@ public class MyHashMap<K,V> implements Map<K,V> {
     /* content display method */
 
     public void display() {
-        System.out.println("Hash Table key-value:  | size : " + size() + " | capacity : " + capacity);
+        System.out.println("Hash Table key-value:  | size : " + size() + " | capacity : " + numberOfSlots);
         int count = 0;
         for (Node<K,V> start: table) {
             System.out.print(count + " : ");
