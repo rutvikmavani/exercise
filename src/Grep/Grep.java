@@ -5,6 +5,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class Grep {
 
@@ -12,38 +15,23 @@ public class Grep {
         String keywordToSearch;
         Set<Character> flags;
         int[] LPS;
-        public long ioTime;
-        public long fileMatchingTime;
+        ExecutorService executorService;
 
         MatchingCriteriaDetails(String keywordToSearch,String flagStr) {
             this.keywordToSearch = keywordToSearch;
 
             flags = new HashSet<>();
-            fillflags(flagStr);
+            insertFlagsFromStr(flags,flagStr);
 
             LPS = preProcess(keywordToSearch);
-
-            ioTime = 0;
-            fileMatchingTime = 0;
+            executorService = Executors.newFixedThreadPool(16);
         }
 
         public String getKeywordToSearch() {
             return keywordToSearch;
         }
 
-        public void setKeywordToSearch(String keywordToSearch) {
-            this.keywordToSearch = keywordToSearch;
-        }
-
-        public int[] getLPS() {
-            return LPS;
-        }
-
-        public void setLPS(int[] LPS) {
-            this.LPS = LPS;
-        }
-
-        private void fillflags(String flagStr) {
+        private void insertFlagsFromStr(Set<Character> flags, String flagStr) {
             if (flagStr == null)
                 return;
 
@@ -57,7 +45,7 @@ public class Grep {
         }
     }
 
-    public static void main(String args[]) {
+    public static void main(String args[]) throws InterruptedException {
 
         long programStartTime = System.currentTimeMillis();
 
@@ -66,7 +54,6 @@ public class Grep {
             System.out.println("usage : java Grep [-flags] [keywordToSearch] [file/directory path ...]");
             return;
         }
-
 
         int argCount = 0;
         String flags = null;
@@ -86,17 +73,14 @@ public class Grep {
             }
         }
 
+
+        matchingCriteriaDetails.executorService.shutdown();
+        matchingCriteriaDetails.executorService.awaitTermination(3600, TimeUnit.SECONDS);
         long programEndTime = System.currentTimeMillis();
 
         long ExecutionTimeInMilli = (programEndTime - programStartTime);
         System.out.println("program execution time in milli seconds : " + ExecutionTimeInMilli);
-        System.out.println("program IO time in milli seconds : " + matchingCriteriaDetails.ioTime);
-        System.out.println("program file processing time in milli seconds : " + matchingCriteriaDetails.fileMatchingTime);
 
-//        program arguments : -r apple /Users/rutvikmavani/directory2/wikiText/text
-//        program execution time in milli seconds : 78015
-//        program IO time in milli seconds : 46138
-//        program file process time in milli seconds : 31300
 
     }
 
@@ -121,10 +105,21 @@ public class Grep {
                 if (matchingCriteriaDetails.containsFlag('r'))
                     matchingFromDirectory(matchingCriteriaDetails,file);
             } else {
-                long fileMatchStartTime = System.currentTimeMillis();
-                matchingFromFile(matchingCriteriaDetails,file);
-                long fileMatchEndTime = System.currentTimeMillis();
-                matchingCriteriaDetails.fileMatchingTime += (fileMatchEndTime - fileMatchStartTime);
+                matchingCriteriaDetails.executorService.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            matchingFromFile(matchingCriteriaDetails,file);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
+//                long fileMatchStartTime = System.currentTimeMillis();
+//                matchingFromFile(matchingCriteriaDetails,file);
+//                long fileMatchEndTime = System.currentTimeMillis();
+//                matchingCriteriaDetails.fileMatchingTime += (fileMatchEndTime - fileMatchStartTime);
+
             }
         }
     }
@@ -134,7 +129,7 @@ public class Grep {
         BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
 
         String keywordToSearch = matchingCriteriaDetails.getKeywordToSearch();
-        int[] LPS = matchingCriteriaDetails.getLPS();
+        int[] LPS = matchingCriteriaDetails.LPS;
 
         int keywordLen = keywordToSearch.length();
         int lineNumber = 1;
@@ -149,8 +144,6 @@ public class Grep {
             long lineReadingEndTime = System.currentTimeMillis();
             if (str == null)
                 break;
-
-            matchingCriteriaDetails.ioTime += lineReadingEndTime - lineReadingStartTime;
 
             int q = 0;
             for(int i=0;i<str.length();i++) {
