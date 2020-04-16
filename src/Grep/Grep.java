@@ -12,10 +12,10 @@ import java.util.concurrent.TimeUnit;
 public class Grep {
 
     private static class MatchingCriteriaDetails {
-        String keywordToSearch;
-        Set<Character> flags;
-        int[] LPS;
-        ExecutorService executorService;
+        private String keywordToSearch;
+        private Set<Character> flags;
+        private int[] LPS;
+        private ExecutorService executorService;
 
         MatchingCriteriaDetails(String keywordToSearch,String flagStr) {
             this.keywordToSearch = keywordToSearch;
@@ -24,7 +24,7 @@ public class Grep {
             insertFlagsFromStr(flags,flagStr);
 
             LPS = preProcess(keywordToSearch);
-            executorService = Executors.newFixedThreadPool(16);
+            executorService = Executors.newFixedThreadPool(2);
         }
 
         public String getKeywordToSearch() {
