@@ -1,13 +1,10 @@
 package Grep;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 public class Grep {
 
@@ -15,26 +12,25 @@ public class Grep {
         private String keywordToSearch;
         private Set<Character> flags;
         private int[] LPS;
+        private int numberOfThreads;
         private ExecutorService executorService;
 
-        MatchingCriteriaDetails(String keywordToSearch,String flagStr) {
+        MatchingCriteriaDetails(String keywordToSearch,String flagStr,int numberOfThreads) {
             this.keywordToSearch = keywordToSearch;
 
-            flags = new HashSet<>();
+            this.flags = new HashSet<>();
             insertFlagsFromStr(flags,flagStr);
 
-            LPS = preProcess(keywordToSearch);
-            executorService = Executors.newFixedThreadPool(2);
-        }
-
-        public String getKeywordToSearch() {
-            return keywordToSearch;
+            this.LPS = preProcess(keywordToSearch);
+            this.numberOfThreads = numberOfThreads;
+            this.executorService = new MyThreadPoolExecutor(numberOfThreads);
         }
 
         private void insertFlagsFromStr(Set<Character> flags, String flagStr) {
             if (flagStr == null)
                 return;
 
+            // flagsStr.charAt(0) is '-'
             for (int i = 1; i < flagStr.length(); i++) {
                 flags.add(flagStr.charAt(i));
             }
@@ -43,27 +39,43 @@ public class Grep {
         public boolean containsFlag(char f) {
             return flags.contains(f);
         }
+
     }
 
-    public static void main(String args[]) throws InterruptedException {
+    public static void main(String args[]) throws InterruptedException, FileNotFoundException {
 
         long programStartTime = System.currentTimeMillis();
 
         int argumentsLength = args.length;
         if (argumentsLength <= 1) {
-            System.out.println("usage : java Grep [-flags] [keywordToSearch] [file/directory path ...]");
+            System.out.println("usage : java Grep [-flags] [keywordToSearch] [-numberOfThreads] [file/directory path ...]");
             return;
         }
 
+        // flags if provided by user
         int argCount = 0;
         String flags = null;
         if (args[0].charAt(0) == '-') {
             flags = args[0];
             argCount++;
         }
+
+        // keyword to search
         String keywordToSearch = args[argCount++];
 
-        MatchingCriteriaDetails matchingCriteriaDetails = new MatchingCriteriaDetails(keywordToSearch,flags);
+        // extract number of threads if provided by user
+        int numberOfThreads = 1;    // default
+        if (argCount < argumentsLength) {
+            int result = extractNumberOfThreads(args[argCount]);
+            if (result != -1) {
+                numberOfThreads = result;
+                argCount++;
+            }
+        }
+
+        MatchingCriteriaDetails matchingCriteriaDetails = new MatchingCriteriaDetails(keywordToSearch,flags,numberOfThreads);
+
+        // file/directory names
         while(argCount < argumentsLength) {
             String filePath = args[argCount++];
             try {
@@ -75,12 +87,13 @@ public class Grep {
 
 
         matchingCriteriaDetails.executorService.shutdown();
-        matchingCriteriaDetails.executorService.awaitTermination(3600, TimeUnit.SECONDS);
+        while (!matchingCriteriaDetails.executorService.isTerminated()) {
+            Thread.sleep(1000);
+        }
+
         long programEndTime = System.currentTimeMillis();
 
-        long ExecutionTimeInMilli = (programEndTime - programStartTime);
-        System.out.println("program execution time in milli seconds : " + ExecutionTimeInMilli);
-
+        System.out.println("program execution time in milli seconds : " + (programEndTime - programStartTime));
 
     }
 
@@ -100,50 +113,47 @@ public class Grep {
     }
 
     private static void matchingFromDirectory(MatchingCriteriaDetails matchingCriteriaDetails, File folder) throws IOException {
-        for (File file : folder.listFiles()) {
+        for (File file : Objects.requireNonNull(folder.listFiles())) {
             if (file.isDirectory()) {
                 if (matchingCriteriaDetails.containsFlag('r'))
                     matchingFromDirectory(matchingCriteriaDetails,file);
             } else {
-                matchingCriteriaDetails.executorService.execute(new Runnable() {
-                    @Override
-                    public void run() {
+
+                if (matchingCriteriaDetails.numberOfThreads > 1) {
+                    matchingCriteriaDetails.executorService.execute(() -> {
                         try {
-                            matchingFromFile(matchingCriteriaDetails,file);
+                            matchingFromFileRandomAccess(matchingCriteriaDetails, file);
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
-                    }
-                });
-//                long fileMatchStartTime = System.currentTimeMillis();
-//                matchingFromFile(matchingCriteriaDetails,file);
-//                long fileMatchEndTime = System.currentTimeMillis();
-//                matchingCriteriaDetails.fileMatchingTime += (fileMatchEndTime - fileMatchStartTime);
-
+                    });
+                }
+                else {
+                    matchingCriteriaDetails.executorService.execute(() -> {
+                        try {
+                            matchingFromFile(matchingCriteriaDetails, file);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    });
+                }
             }
         }
     }
 
     private static void matchingFromFile(MatchingCriteriaDetails matchingCriteriaDetails, File file) throws IOException {
 
-        BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
-
-        String keywordToSearch = matchingCriteriaDetails.getKeywordToSearch();
+        String keywordToSearch = matchingCriteriaDetails.keywordToSearch;
+        int keywordLen = keywordToSearch.length();
         int[] LPS = matchingCriteriaDetails.LPS;
 
-        int keywordLen = keywordToSearch.length();
         int lineNumber = 1;
         List<Integer> matchedLineNumbers = new ArrayList<>();
 
-        String str = null;
-        long lineReadingTime = 0;
-        while (true) {
+        BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
 
-            long lineReadingStartTime = System.currentTimeMillis();
-            str = bufferedReader.readLine();
-            long lineReadingEndTime = System.currentTimeMillis();
-            if (str == null)
-                break;
+        String str;
+        while ((str = bufferedReader.readLine()) != null) {
 
             int q = 0;
             for(int i=0;i<str.length();i++) {
@@ -162,20 +172,71 @@ public class Grep {
             }
             lineNumber++;
         }
-
         bufferedReader.close();
 
+        printResults(file.getPath(),matchedLineNumbers,matchingCriteriaDetails);
+    }
 
 
-//        if (matchedLineNumbers.size() == 0)
-//            System.out.println("No match found in file : " + file.getPath());
-//        else {
-//            for (Integer matchedLineNumber : matchedLineNumbers) {
-//                System.out.println(file.getPath() + " : " + matchedLineNumber);
-//            }
-//        }
-        System.out.println(file.getPath() + " : " + matchedLineNumbers.size());
+    private static void matchingFromFileRandomAccess(MatchingCriteriaDetails matchingCriteriaDetails, File file) throws IOException {
 
+        String keywordToSearch = matchingCriteriaDetails.keywordToSearch;
+        int keywordLen = keywordToSearch.length();
+        int[] LPS = matchingCriteriaDetails.LPS;
+
+        int lineNumber = 1;
+        List<Integer> matchedLineNumbers = new ArrayList<>();
+
+        RandomAccessFile randomAccessFile = new RandomAccessFile(file.getPath(), "r");
+        FileChannel inChannel = randomAccessFile.getChannel();
+        ByteBuffer buffer = ByteBuffer.allocate(1024);
+
+        int q = 0;
+        int charRead = 0;
+        while((charRead = inChannel.read(buffer)) > 0)
+        {
+            buffer.flip();
+            for (int i = 0; i < charRead; i++)
+            {
+                char c = (char) buffer.get();
+                while (q > 0 && keywordToSearch.charAt(q) != c)
+                    q = LPS[q-1];
+
+                if (keywordToSearch.charAt(q) == c)
+                    q++;
+
+                if (q == keywordLen) {
+                    /* match found */
+                    q = LPS[q-1];
+                    matchedLineNumbers.add(lineNumber);
+                }
+                if (c == '\n')
+                    lineNumber++;
+            }
+            buffer.clear();
+        }
+        inChannel.close();
+        randomAccessFile.close();
+
+        printResults(file.getPath(),matchedLineNumbers,matchingCriteriaDetails);
+
+    }
+
+
+    private static void printResults(String filepath, List<Integer> matchedLineNumbers, MatchingCriteriaDetails matchingCriteriaDetails) {
+        // print results according to flags
+        if (matchingCriteriaDetails.containsFlag('c')) {
+            System.out.println(filepath + " : " + matchedLineNumbers.size());
+        }
+        else {
+            if (matchedLineNumbers.size() == 0)
+                System.out.println("No match found in file : " + filepath);
+            else {
+                for (Integer matchedLineNumber : matchedLineNumbers) {
+                    System.out.println(filepath + " : " + matchedLineNumber);
+                }
+            }
+        }
     }
 
     private static int[] preProcess(String pattern) {
@@ -192,5 +253,24 @@ public class Grep {
         }
 
         return prefix;
+    }
+
+    // if valid string is entered returns number of threads
+    // else return -1
+    private static int extractNumberOfThreads(String str) {
+        if (str == null || str.length() < 1)
+            return -1;
+
+        for(int i=1;i<str.length();i++) {
+            if (str.charAt(i) < '0' || str.charAt(i) > '9')
+                return -1;
+        }
+
+        int num = 0;
+        for(int i=1;i<str.length();i++) {
+            int digit = (str.charAt(i) - '0');
+            num = num * 10 + digit;
+        }
+        return num;
     }
 }
