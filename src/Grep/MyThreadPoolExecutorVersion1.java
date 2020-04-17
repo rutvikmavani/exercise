@@ -6,19 +6,23 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class MyThreadPoolExecutor implements ExecutorService {
+
+// only fixed thread number of threads are created
+public class MyThreadPoolExecutorVersion1 implements ExecutorService {
 
     private class ExecutorThreadRunnable implements Runnable {
 
         @Override
         public void run() {
+            terminated.lock();
+            activeThreads++;
+            terminated.unlock();
             try {
                 while (true) {
                     lock.lock();
 
-                    while (taskQueue.size() == 0) {
+                    while (taskQueue.size() == 0 || Thread.currentThread().isInterrupted()) {
                         if (shutDown) {
-                            lock.unlock();
                             return;
                         }
                         empty.await();
@@ -30,8 +34,14 @@ public class MyThreadPoolExecutor implements ExecutorService {
                     task.run();
                 }
             }
-            catch (InterruptedException e) {
+            catch (Exception e) {
 
+            }
+            finally {
+                terminated.lock();
+                activeThreads--;
+                terminated.unlock();
+                lock.unlock();
             }
         }
     }
@@ -39,13 +49,19 @@ public class MyThreadPoolExecutor implements ExecutorService {
     private Queue<Runnable> taskQueue;
     private ExecutorThreadRunnable executorThreadRunnable[];
     private Thread threads[];
+
     private Lock lock = new ReentrantLock();    // multiple producer
     private Condition empty = lock.newCondition();
     private volatile boolean shutDown = false;
 
+    private volatile int activeThreads = 0;
 
-    MyThreadPoolExecutor(int numberOfThreads) {
-        taskQueue = new ArrayDeque<>(100000);
+    private Lock terminated = new ReentrantLock();
+    private Condition allDone = terminated.newCondition();
+
+
+    MyThreadPoolExecutorVersion1(int numberOfThreads) {
+        taskQueue = new LinkedList<>();
 
         executorThreadRunnable = new ExecutorThreadRunnable[numberOfThreads];
         threads = new Thread[numberOfThreads];
@@ -60,16 +76,36 @@ public class MyThreadPoolExecutor implements ExecutorService {
     @Override
     public void shutdown() {
         lock.lock();
-        if (shutDown)
-            return;
-        shutDown = true;
-        empty.signalAll();
-        lock.unlock();
+        try {
+            if (shutDown)
+                return;
+            shutDown = true;
+            empty.signalAll();
+        }
+        finally {
+            lock.unlock();
+        }
     }
 
     @Override
     public List<Runnable> shutdownNow() {
-        return null;
+        lock.lock();
+        try {
+            if (shutDown)
+                return null;
+            shutDown = true;
+            for (Thread thread : threads) {
+                thread.interrupt();
+            }
+            List<Runnable> list = new ArrayList<>();
+            while (!taskQueue.isEmpty()) {
+                list.add(taskQueue.poll());
+            }
+            return list;
+        }
+        finally {
+            lock.unlock();
+        }
     }
 
     @Override
@@ -79,18 +115,20 @@ public class MyThreadPoolExecutor implements ExecutorService {
 
     @Override
     public boolean isTerminated() {
-
-        for(int i=0;i<threads.length;i++) {
-            if (threads[i].getState() != Thread.State.TERMINATED) {
-                return false;
-            }
-        }
-        return true;
+        return activeThreads == 0;
     }
 
     @Override
     public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
-        return false;
+        terminated.lock();
+        if (activeThreads == 0)
+            return true;
+        try {
+            return allDone.await(timeout, unit);
+        }
+        finally {
+            terminated.unlock();
+        }
     }
 
     @Override

@@ -23,7 +23,7 @@ public class Grep {
 
             this.LPS = preProcess(keywordToSearch);
             this.numberOfThreads = numberOfThreads;
-            this.executorService = new MyThreadPoolExecutor(numberOfThreads);
+            this.executorService = new MyThreadPoolExecutorVersion1(numberOfThreads);
         }
 
         private void insertFlagsFromStr(Set<Character> flags, String flagStr) {
