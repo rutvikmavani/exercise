@@ -40,6 +40,8 @@ public class MyThreadPoolExecutorVersion1 implements ExecutorService {
             finally {
                 terminated.lock();
                 activeThreads--;
+                if (activeThreads == 0)
+                    allDone.signal();
                 terminated.unlock();
                 lock.unlock();
             }
