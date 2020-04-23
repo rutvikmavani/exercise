@@ -1,15 +1,15 @@
 package Grep;
 
 import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class Grep {
 
     private static class MatchingCriteriaDetails {
         private String keywordToSearch;
+        private byte[] keywordToSearchByteArray;
         private Set<Character> flags;
         private int[] LPS;
         private int numberOfThreads;
@@ -17,11 +17,12 @@ public class Grep {
 
         MatchingCriteriaDetails(String keywordToSearch,String flagStr,int numberOfThreads) {
             this.keywordToSearch = keywordToSearch;
+            this.keywordToSearchByteArray = keywordToSearch.getBytes();
 
             this.flags = new HashSet<>();
             insertFlagsFromStr(flags,flagStr);
 
-            this.LPS = preProcess(keywordToSearch);
+            this.LPS = preProcess(this.keywordToSearchByteArray);
             this.numberOfThreads = numberOfThreads;
             this.executorService = new MyThreadPoolExecutorVersion1(numberOfThreads);
         }
@@ -85,11 +86,8 @@ public class Grep {
             }
         }
 
-
         matchingCriteriaDetails.executorService.shutdown();
-        while (!matchingCriteriaDetails.executorService.isTerminated()) {
-            Thread.sleep(1000);
-        }
+        matchingCriteriaDetails.executorService.awaitTermination(10, TimeUnit.MINUTES);
 
         long programEndTime = System.currentTimeMillis();
 
@@ -118,91 +116,38 @@ public class Grep {
                 if (matchingCriteriaDetails.containsFlag('r'))
                     matchingFromDirectory(matchingCriteriaDetails,file);
             } else {
-
-                if (matchingCriteriaDetails.numberOfThreads > 1) {
-                    matchingCriteriaDetails.executorService.execute(() -> {
-                        try {
-                            matchingFromFileRandomAccess(matchingCriteriaDetails, file);
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    });
-                }
-                else {
-                    matchingCriteriaDetails.executorService.execute(() -> {
-                        try {
-                            matchingFromFile(matchingCriteriaDetails, file);
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    });
-                }
+                matchingCriteriaDetails.executorService.execute(() -> {
+                    try {
+                        matchingFromFile(matchingCriteriaDetails, file);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
             }
         }
     }
 
     private static void matchingFromFile(MatchingCriteriaDetails matchingCriteriaDetails, File file) throws IOException {
 
-        String keywordToSearch = matchingCriteriaDetails.keywordToSearch;
-        int keywordLen = keywordToSearch.length();
+        byte[] keywordToSearchArray = matchingCriteriaDetails.keywordToSearchByteArray;
+        int keywordLen = keywordToSearchArray.length;
         int[] LPS = matchingCriteriaDetails.LPS;
 
         int lineNumber = 1;
         List<Integer> matchedLineNumbers = new ArrayList<>();
 
-        BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
-
-        String str;
-        while ((str = bufferedReader.readLine()) != null) {
-
-            int q = 0;
-            for(int i=0;i<str.length();i++) {
-
-                while (q > 0 && keywordToSearch.charAt(q) != str.charAt(i))
-                    q = LPS[q-1];
-
-                if (keywordToSearch.charAt(q) == str.charAt(i))
-                    q++;
-
-                if (q == keywordLen) {
-                    /* match found */
-                    q = LPS[q-1];
-                    matchedLineNumbers.add(lineNumber);
-                }
-            }
-            lineNumber++;
-        }
-        bufferedReader.close();
-
-        printResults(file.getPath(),matchedLineNumbers,matchingCriteriaDetails);
-    }
-
-
-    private static void matchingFromFileRandomAccess(MatchingCriteriaDetails matchingCriteriaDetails, File file) throws IOException {
-
-        String keywordToSearch = matchingCriteriaDetails.keywordToSearch;
-        int keywordLen = keywordToSearch.length();
-        int[] LPS = matchingCriteriaDetails.LPS;
-
-        int lineNumber = 1;
-        List<Integer> matchedLineNumbers = new ArrayList<>();
-
-        RandomAccessFile randomAccessFile = new RandomAccessFile(file.getPath(), "r");
-        FileChannel inChannel = randomAccessFile.getChannel();
-        ByteBuffer buffer = ByteBuffer.allocate(1024);
-
+        FileInputStream fileInputStream = new FileInputStream(file);
+        byte[] text = new byte[1024];
+        int byteRead = 0;
         int q = 0;
-        int charRead = 0;
-        while((charRead = inChannel.read(buffer)) > 0)
-        {
-            buffer.flip();
-            for (int i = 0; i < charRead; i++)
-            {
-                char c = (char) buffer.get();
-                while (q > 0 && keywordToSearch.charAt(q) != c)
+        while ((byteRead = fileInputStream.read(text)) != -1) {
+
+            for(int i=0;i<byteRead;i++) {
+
+                while (q > 0 && keywordToSearchArray[q] != text[i])
                     q = LPS[q-1];
 
-                if (keywordToSearch.charAt(q) == c)
+                if (keywordToSearchArray[q] == text[i])
                     q++;
 
                 if (q == keywordLen) {
@@ -210,18 +155,13 @@ public class Grep {
                     q = LPS[q-1];
                     matchedLineNumbers.add(lineNumber);
                 }
-                if (c == '\n')
+                if (text[i] == '\n')
                     lineNumber++;
             }
-            buffer.clear();
         }
-        inChannel.close();
-        randomAccessFile.close();
-
+        fileInputStream.close();
         printResults(file.getPath(),matchedLineNumbers,matchingCriteriaDetails);
-
     }
-
 
     private static void printResults(String filepath, List<Integer> matchedLineNumbers, MatchingCriteriaDetails matchingCriteriaDetails) {
         // print results according to flags
@@ -239,15 +179,15 @@ public class Grep {
         }
     }
 
-    private static int[] preProcess(String pattern) {
-        int patternLen = pattern.length();
+    private static int[] preProcess(byte[] pattern) {
+        int patternLen = pattern.length;
         int prefix[] = new int[patternLen];
         prefix[0] = 0;
         int k = 0;
         for(int i=1;i<patternLen;i++) {
-            while (k > 0 && pattern.charAt(k) != pattern.charAt(i))
+            while (k > 0 && pattern[k] != pattern[i])
                 k = prefix[k-1];
-            if (pattern.charAt(k) == pattern.charAt(i))
+            if (pattern[k] == pattern[i])
                 k++;
             prefix[i] = k;
         }
