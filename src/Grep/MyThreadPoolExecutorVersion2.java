@@ -29,10 +29,6 @@ public class MyThreadPoolExecutorVersion2 implements ExecutorService {
         this.unit = unit;
     }
 
-    public void allowCoreThreadTimeOut(boolean value) {
-
-    }
-
     @Override
     public void shutdown() {
         lock.lock();

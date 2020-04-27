@@ -264,7 +264,228 @@ public class MyConcurrentHashMap<K,V> implements Map<K,V> {
 
 
     /*---------------- classes for iterator ---------------*/
+    private class EntrySet implements Set<Map.Entry<K,V>> {
+
+        private class EntrySetIterator implements Iterator<Map.Entry<K,V> > {
+
+            int segmentIndex;
+            int slotIndex;
+            Node<K,V> node;
+            Node<K,V> nextNode;
+
+            EntrySetIterator() {
+                this.segmentIndex = 0;
+                this.slotIndex = 0;
+                this.node = null;
+                this.nextNode = null;
+                while (segmentIndex < segments.length) {
+                    while (slotIndex < segments[segmentIndex].table.length && segments[segmentIndex].table[slotIndex] == null) {
+                        slotIndex++;
+                    }
+                    if (slotIndex == segments[segmentIndex].table.length) {
+                        segmentIndex++;
+                        slotIndex = 0;
+                    }
+                    else {
+                        nextNode = segments[segmentIndex].table[slotIndex];
+                        break;
+                    }
+                }
+            }
+
+            @Override
+            public boolean hasNext() {
+                return (nextNode != null);
+            }
+
+            @Override
+            public Entry<K, V> next() {
+                if (nextNode == null)
+                    throw new NoSuchElementException();
+                node = nextNode;
+                if(nextNode.next == null) {
+                    slotIndex++;
+                    while (segmentIndex < segments.length) {
+                        while (slotIndex < segments[segmentIndex].table.length && segments[segmentIndex].table[slotIndex] == null) {
+                            slotIndex++;
+                        }
+                        if (slotIndex == segments[segmentIndex].table.length) {
+                            segmentIndex++;
+                            slotIndex = 0;
+                        }
+                        else {
+                            nextNode = segments[segmentIndex].table[slotIndex];
+                            break;
+                        }
+                    }
+                    if (segmentIndex == segments.length)
+                        nextNode = null;
+                }
+                else {
+                    nextNode = nextNode.next;
+                }
+                return node;
+            }
+
+            @Override
+            public void remove() {
+                if (node == null)
+                    throw new IllegalStateException();
+                MyConcurrentHashMap.this.remove(node.getKey());
+                node = null;
+            }
+        }
+
+        // copy of segments
+        Segment<K,V>[] segments;
+        EntrySet() {
+            segments = new Segment[concurrencyLevel];
+            for(int i=0;i<MyConcurrentHashMap.this.segments.length;i++) {
+                segments[i] = MyConcurrentHashMap.this.segments[i];
+            }
+        }
+
+        @Override
+        public int size() {
+            int sum = 0;
+            for (int i=0;i<segments.length;i++) {
+                sum += segments[i].numberOfNodes;
+            }
+            return sum;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return size() == 0;
+        }
+
+        @Override
+        public boolean contains(Object o) {
+            return false;
+        }
+
+        @Override
+        public Iterator<Entry<K, V>> iterator() {
+            return new EntrySetIterator();
+        }
+
+        @Override
+        public Object[] toArray() {
+            return new Object[0];
+        }
+
+        @Override
+        public <T> T[] toArray(T[] a) {
+            return null;
+        }
+
+        @Override
+        public boolean add(Entry<K, V> kvEntry) {
+            return false;
+        }
+
+        @Override
+        public boolean remove(Object o) {
+            return false;
+        }
+
+        @Override
+        public boolean containsAll(Collection<?> c) {
+            return false;
+        }
+
+        @Override
+        public boolean addAll(Collection<? extends Entry<K, V>> c) {
+            return false;
+        }
+
+        @Override
+        public boolean retainAll(Collection<?> c) {
+            return false;
+        }
+
+        @Override
+        public boolean removeAll(Collection<?> c) {
+            return false;
+        }
+
+        @Override
+        public void clear() {
+
+        }
+    }
+
     private class KeySet implements Set<K> {
+
+        private class KeySetIterator implements Iterator<K> {
+
+            int segmentIndex;
+            int slotIndex;
+            Node<K,V> node;
+            Node<K,V> nextNode;
+
+            KeySetIterator() {
+                this.segmentIndex = 0;
+                this.slotIndex = 0;
+                this.node = null;
+                this.nextNode = null;
+                while (segmentIndex < segments.length) {
+                    while (slotIndex < segments[segmentIndex].table.length && segments[segmentIndex].table[slotIndex] == null) {
+                        slotIndex++;
+                    }
+                    if (slotIndex == segments[segmentIndex].table.length) {
+                        segmentIndex++;
+                        slotIndex = 0;
+                    }
+                    else {
+                        nextNode = segments[segmentIndex].table[slotIndex];
+                        break;
+                    }
+                }
+            }
+
+            @Override
+            public boolean hasNext() {
+                return (nextNode != null);
+            }
+
+            @Override
+            public K next() {
+                if (nextNode == null)
+                    throw new NoSuchElementException();
+                node = nextNode;
+                if(nextNode.next == null) {
+                    slotIndex++;
+                    while (segmentIndex < segments.length) {
+                        while (slotIndex < segments[segmentIndex].table.length && segments[segmentIndex].table[slotIndex] == null) {
+                            slotIndex++;
+                        }
+                        if (slotIndex == segments[segmentIndex].table.length) {
+                            segmentIndex++;
+                            slotIndex = 0;
+                        }
+                        else {
+                            nextNode = segments[segmentIndex].table[slotIndex];
+                            break;
+                        }
+                    }
+                    if (segmentIndex == segments.length)
+                        nextNode = null;
+                }
+                else {
+                    nextNode = nextNode.next;
+                }
+                return node.getKey();
+            }
+
+            @Override
+            public void remove() {
+                if (node == null)
+                    throw new IllegalStateException();
+                MyConcurrentHashMap.this.remove(node.getKey());
+                node = null;
+            }
+        }
 
         // copy of segments
         Segment<K,V>[] segments;
@@ -296,7 +517,7 @@ public class MyConcurrentHashMap<K,V> implements Map<K,V> {
 
         @Override
         public Iterator<K> iterator() {
-            return null;
+            return new KeySetIterator();
         }
 
         @Override
@@ -345,23 +566,174 @@ public class MyConcurrentHashMap<K,V> implements Map<K,V> {
         }
     }
 
+    private class ValueCollection implements Collection<V> {
 
+        private class ValueCollectionIterator implements Iterator<V> {
+
+            int segmentIndex;
+            int slotIndex;
+            Node<K,V> node;
+            Node<K,V> nextNode;
+
+            ValueCollectionIterator() {
+                this.segmentIndex = 0;
+                this.slotIndex = 0;
+                this.node = null;
+                this.nextNode = null;
+                while (segmentIndex < segments.length) {
+                    while (slotIndex < segments[segmentIndex].table.length && segments[segmentIndex].table[slotIndex] == null) {
+                        slotIndex++;
+                    }
+                    if (slotIndex == segments[segmentIndex].table.length) {
+                        segmentIndex++;
+                        slotIndex = 0;
+                    }
+                    else {
+                        nextNode = segments[segmentIndex].table[slotIndex];
+                        break;
+                    }
+                }
+            }
+
+            @Override
+            public boolean hasNext() {
+                return nextNode != null;
+            }
+
+            @Override
+            public V next() {
+                if (nextNode == null)
+                    throw new NoSuchElementException();
+                node = nextNode;
+                if(nextNode.next == null) {
+                    slotIndex++;
+                    while (segmentIndex < segments.length) {
+                        while (slotIndex < segments[segmentIndex].table.length && segments[segmentIndex].table[slotIndex] == null) {
+                            slotIndex++;
+                        }
+                        if (slotIndex == segments[segmentIndex].table.length) {
+                            segmentIndex++;
+                            slotIndex = 0;
+                        }
+                        else {
+                            nextNode = segments[segmentIndex].table[slotIndex];
+                            break;
+                        }
+                    }
+                    if (segmentIndex == segments.length)
+                        nextNode = null;
+                }
+                else {
+                    nextNode = nextNode.next;
+                }
+                return node.getValue();
+            }
+
+            @Override
+            public void remove() {
+                if (node == null)
+                    throw new IllegalStateException();
+                MyConcurrentHashMap.this.remove(node.getKey());
+                node = null;
+            }
+        }
+
+        // copy of segments
+        Segment<K,V>[] segments;
+        ValueCollection() {
+            segments = new Segment[concurrencyLevel];
+            for(int i=0;i<MyConcurrentHashMap.this.segments.length;i++) {
+                segments[i] = MyConcurrentHashMap.this.segments[i];
+            }
+        }
+
+        @Override
+        public int size() {
+            int sum = 0;
+            for (int i=0;i<segments.length;i++) {
+                sum += segments[i].numberOfNodes;
+            }
+            return sum;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return size() == 0;
+        }
+
+        @Override
+        public boolean contains(Object o) {
+            return false;
+        }
+
+        @Override
+        public Iterator<V> iterator() {
+            return new ValueCollectionIterator();
+        }
+
+        @Override
+        public Object[] toArray() {
+            return new Object[0];
+        }
+
+        @Override
+        public <T> T[] toArray(T[] a) {
+            return null;
+        }
+
+        @Override
+        public boolean add(V v) {
+            return false;
+        }
+
+        @Override
+        public boolean remove(Object o) {
+            return false;
+        }
+
+        @Override
+        public boolean containsAll(Collection<?> c) {
+            return false;
+        }
+
+        @Override
+        public boolean addAll(Collection<? extends V> c) {
+            return false;
+        }
+
+        @Override
+        public boolean removeAll(Collection<?> c) {
+            return false;
+        }
+
+        @Override
+        public boolean retainAll(Collection<?> c) {
+            return false;
+        }
+
+        @Override
+        public void clear() {
+
+        }
+    }
+
+    /*-----------------------------------------------------*/
 
 
 
     @Override
     public Set<K> keySet() {
-        return null;
+        return new KeySet();
     }
 
     @Override
     public Collection<V> values() {
-        return null;
+        return new ValueCollection();
     }
 
     @Override
     public Set<Entry<K, V>> entrySet() {
-        return null;
+        return new EntrySet();
     }
 
     public void display() {
