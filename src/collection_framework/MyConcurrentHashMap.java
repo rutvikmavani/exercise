@@ -37,9 +37,9 @@ public class MyConcurrentHashMap<K,V> implements Map<K,V> {
         }
     }
     private class Segment<K,V> {
-        private int numberOfNodes;
-        private int numberOfSlots;
-        private Node<K,V> table[];
+        volatile private int numberOfNodes;
+        volatile private int numberOfSlots;
+        volatile private Node<K,V> table[];
         Segment() {
             this.numberOfNodes = 0;
             this.numberOfSlots = DEFAULT_NUMBER_OF_SLOTS_PER_SEGMENT;
